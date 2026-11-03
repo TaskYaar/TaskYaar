@@ -1,144 +1,221 @@
-# TaskYaar
+# Taskyaar
 
-> *Kaam bhi, kamai bhi — apne sheher mein.*
+A task marketplace platform. This repository contains the Django REST API, the PostgreSQL database and the React web app, all run together with Docker Compose.
 
-TaskYaar is a hyperlocal task marketplace. People **post everyday tasks** (errands, pickups, assembly, help), nearby **workers apply**, the poster **accepts one**, they coordinate over **chat**, the money is **held safely (escrow)** until the job is done, and both sides **review** each other.
+## Tech stack
 
-This repository is the **production rebuild (v2)**. The earlier Django-template prototype and the React mock-data frontend are used only as references for product flow and UI.
+| Part | Technology |
+|------|------------|
+| Backend API | Python 3.12, Django, Django REST Framework |
+| Database | PostgreSQL 16 |
+| Frontend | React 18, Vite |
+| Runtime | Docker and Docker Compose |
 
-> **Status:** Folder structure only. Every file is an empty placeholder. Nothing is implemented yet. Build order is in [Roadmap](#roadmap).
+## Prerequisites
 
----
+Install these once:
 
-## 1. Tech stack
+1. **Docker Desktop** (Windows or Mac) or Docker Engine with the Compose plugin (Linux). On Windows, keep "Use WSL 2" enabled.
+2. **Git**
+3. **VS Code** (recommended)
 
-| Layer | Technology |
-|---|---|
-| Frontend | React 19, TypeScript, Vite, TanStack Query, React Router, Zod, React Hook Form |
-| Backend | Python, Django, Django REST Framework, Django Channels |
-| Database | PostgreSQL + PostGIS (location search) |
-| Cache / queue | Redis, Celery |
-| Auth | Phone OTP, JWT in httpOnly cookies |
-| Payments | Razorpay Route (marketplace split payments) |
-| Files | S3 / Cloudflare R2 |
-| Notifications | FCM (push), SMS provider (MSG91 or similar) |
-| DevOps | Docker, GitHub Actions, Nginx, Sentry |
+Check that Docker works:
 
----
+```
+docker --version
+docker compose version
+docker run hello-world
+```
 
-## 2. Repository layout
+You do not need to install Python, Node or PostgreSQL on your own machine. Everything runs inside containers.
+
+## Quick start
+
+Run all commands from the project root, the folder that contains `docker-compose.yml`.
+
+### 1. Get the code
+
+```
+git clone <repository-url>
+cd taskyaar
+```
+
+### 2. Create your environment files
+
+Windows (PowerShell):
+
+```
+Copy-Item backend\.env.example backend\.env
+Copy-Item web\.env.example web\.env
+```
+
+Mac / Linux:
+
+```
+cp backend/.env.example backend/.env
+cp web/.env.example web/.env
+```
+
+### 3. Set your secret key
+
+Generate a random key.
+
+Windows (PowerShell):
+
+```
+-join ((48..57) + (65..90) + (97..122) | Get-Random -Count 50 | ForEach-Object {[char]$_})
+```
+
+Mac / Linux:
+
+```
+python3 -c "import secrets; print(secrets.token_urlsafe(50))"
+```
+
+Open `backend/.env` and replace `change-me-to-a-long-random-string` with the generated value:
+
+```
+DJANGO_SECRET_KEY=your-generated-key
+```
+
+Do not add spaces or quotes. Never commit this file or share your key.
+
+If VS Code shows **CRLF** in the bottom-right corner when editing `.env`, click it, choose **LF** and save.
+
+### 4. Build and start
+
+```
+docker compose build
+docker compose up -d
+docker compose ps
+```
+
+The first build takes a few minutes. On start, the API waits for the database, applies migrations automatically and then runs.
+
+### 5. Check that it works
+
+| What | URL |
+|------|-----|
+| Web app | http://localhost:5173 |
+| API health check | http://localhost:8000/api/health/ (should show `{"status": "ok"}`) |
+| Tasks API | http://localhost:8000/api/tasks/ |
+| Django admin | http://localhost:8000/admin/ |
+
+To use the admin, create a superuser:
+
+```
+docker compose exec api python manage.py createsuperuser
+```
+
+## Daily commands
+
+| Task | Command |
+|------|---------|
+| Start everything | `docker compose up -d` |
+| Stop everything | `docker compose down` |
+| See running services | `docker compose ps` |
+| View logs | `docker compose logs -f api` (or `web`, `db`) |
+| Rebuild after dependency changes | `docker compose build` then `docker compose up -d` |
+| Restart one service | `docker compose restart api` |
+| Wipe the database too | `docker compose down -v` (deletes all data) |
+
+## Backend commands
+
+```
+docker compose exec api python manage.py makemigrations
+docker compose exec api python manage.py migrate
+docker compose exec api python manage.py test
+docker compose exec api python manage.py shell
+```
+
+Whenever you change a model, run `makemigrations` and commit the new migration file.
+
+## Frontend commands
+
+```
+docker compose exec web npm install <package-name>
+docker compose exec web npm run build
+```
+
+After adding a package, run `docker compose build web` so it is saved in the image.
+
+## Project structure
 
 ```
 taskyaar/
-├── backend/     Django API + WebSocket server        → see backend/README.md
-├── web/         React app (PWA)                      → see web/README.md
-├── infra/       Dockerfiles, compose files, scripts
-├── docs/        Decisions, API, state machines, runbook, legal
-├── .github/     CI/CD workflows, PR template
-├── docker-compose.yml
-└── Makefile     One-word shortcuts (run, test, lint)
+├── backend/
+│   ├── config/          Django settings, URLs, WSGI/ASGI
+│   │   └── settings/    base.py, dev.py
+│   ├── apps/            One folder per feature (tasks, users, chat, ...)
+│   ├── common/          Shared helpers
+│   ├── tests/           Cross-app and end-to-end tests
+│   ├── requirements.txt Python dependencies
+│   └── Dockerfile
+├── web/
+│   ├── src/
+│   │   ├── app/         App shell, layouts, route guards
+│   │   ├── features/    One folder per feature (auth, tasks, chat, ...)
+│   │   ├── shared/      Reusable UI, hooks, API client, helpers
+│   │   └── styles/
+│   ├── package.json
+│   └── Dockerfile
+├── docs/                Project documentation
+├── infra/               Deployment and scripts
+├── .github/workflows/   CI pipelines
+└── docker-compose.yml
 ```
 
----
+Current status: `apps/tasks` is working. The other app folders are placeholders for upcoming features.
 
-## 3. How the system fits together
+## Configuration
 
-```
- Browser / PWA (web/)
-        │  HTTPS (REST)            WebSocket (chat, live updates)
-        ▼                                   ▼
-      Nginx ───────────────► Django API (DRF) + Channels (ASGI)
-                                   │        │         │
-                                   ▼        ▼         ▼
-                              PostgreSQL  Redis   Celery workers
-                              (+PostGIS)  (cache,  (SMS, push,
-                                          sockets)  payouts, timers)
-                                   │
-                         Razorpay · S3/R2 · FCM · SMS
-```
+Settings live in `backend/.env` (copied from `.env.example`):
 
----
+| Variable | Meaning |
+|----------|---------|
+| `DJANGO_SECRET_KEY` | Secret key. Unique per person and per environment. |
+| `DJANGO_DEBUG` | `1` for development, `0` for production |
+| `DJANGO_ALLOWED_HOSTS` | Comma-separated allowed host names |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated web origins allowed to call the API |
+| `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Database name and login |
+| `POSTGRES_HOST`, `POSTGRES_PORT` | Use `db` and `5432` with Docker Compose |
 
-## 4. Core product flow
+`web/.env` contains `VITE_PROXY_TARGET`, the address the dev server forwards `/api` requests to (`http://api:8000` with Docker).
 
-```
-POST TASK → APPLY → ACCEPT → PAY (held) → WORK → SUBMIT → CONFIRM → RELEASE PAYMENT → REVIEW
-```
+## Team workflow
 
-| Step | Who | What happens |
-|---|---|---|
-| Post | Poster | Creates task with category, budget (₹), location, time |
-| Apply | Worker | Sends pitch and optional proposed rate |
-| Accept | Poster | Picks one applicant; others are declined; a **Booking** is created |
-| Pay | Poster | Pays; money is **held**, not yet paid out |
-| Work | Worker | Starts task, chats with poster |
-| Submit | Worker | Marks work done with a note |
-| Confirm | Poster | Confirms; payment is released to worker minus platform fee |
-| Review | Both | 1–5 stars and comment; ratings update trust scores |
+1. Update your main branch: `git checkout main && git pull`
+2. Create a branch for your work: `git checkout -b feature/short-description`
+3. Make small commits with clear messages.
+4. Run the tests before pushing: `docker compose exec api python manage.py test`
+5. Push your branch and open a pull request for review.
 
-If something goes wrong, either side can **cancel** (refund rules in `docs/state-machine.md`) or open a **dispute**.
+Rules:
 
----
+- Never commit `.env` files. They are ignored by `.gitignore`.
+- Commit migration files together with the model changes that created them.
+- If you add a dependency, add it to `backend/requirements.txt` or `web/package.json`, then tell the team to rebuild.
 
-## 5. Team rules (please read)
+## Troubleshooting
 
-1. **Money rules are sacred.** Never change payment or ledger code without a second reviewer.
-2. **Backend layering:** `views` → `services` (writes) / `selectors` (reads) → `models`. No business logic in views or serializers. Details in `backend/README.md`.
-3. **Frontend layering:** each feature owns its API calls, hooks, schemas, components and pages. `shared/` never imports from `features/`. Details in `web/README.md`.
-4. **No mock data in production code.** Mocks live only in `web/src/test/`.
-5. **No secrets in Git.** Use `.env` files (ignored) and `.env.example` (committed, no real values).
-6. **Every PR needs:** passing CI, one review, and tests for new logic.
-7. **State changes only through services.** Task, booking and payment status is never edited directly.
-8. **Write decisions down.** Add a short entry to `docs/decisions.md` for any choice that affects architecture.
+| Problem | Fix |
+|---------|-----|
+| `no configuration file provided: not found` | You are in the wrong folder. `cd` into the folder that contains `docker-compose.yml`. |
+| `empty compose file` | The project files did not copy or extract properly. Re-clone or re-extract and check `docker-compose.yml` is not 0 bytes. |
+| `env file ... not found` | You skipped step 2. Create `backend/.env` and `web/.env`. |
+| `KeyError: 'DJANGO_SECRET_KEY'` | `backend/.env` is missing the key or the file name is wrong (for example `.env.txt`). |
+| Port already in use (5173, 8000 or 5432) | Stop the other program using it, or change the port mapping in `docker-compose.yml`. |
+| `docker` is not recognized | Close all terminals and open a new one. If it persists, restart Docker Desktop. |
+| Docker stuck on "Starting..." | Restart your computer, then open Docker Desktop again. |
+| "WSL 2 installation is incomplete" | Run `wsl --update` in PowerShell, then restart Docker Desktop. |
+| Virtualization error | Enable Intel VT-x or AMD SVM in your BIOS. |
+| API cannot connect to the database | Run `docker compose logs db`. Make sure `POSTGRES_HOST=db` in `backend/.env`. |
+| Web shows "unreachable" for API status | Check `docker compose ps` and `docker compose logs api`. |
+| Odd errors after pulling new changes | Run `docker compose build` then `docker compose up -d`. |
+| Want a completely fresh start | `docker compose down -v`, then `docker compose build --no-cache`, then `docker compose up -d`. |
 
-Git workflow is in `docs/git-workflow.md`: `main` (protected) ← `develop` ← `feature/...` branches.
+## Security notes
 
----
-
-## 6. Roadmap
-
-| Phase | Weeks | Goal |
-|---|---|---|
-| 0 Foundation | 1 | Decisions locked, repo, Docker, CI, lint/format hooks |
-| 1 Backend core | 2–3 | Custom user, tasks, bookings and state machine, API + tests |
-| 2 Auth and trust | 3–4 | OTP login, JWT cookies, KYC status, block/report, throttling |
-| 3 Payments | 4–6 | Razorpay, webhooks, immutable ledger, refunds, auto-release |
-| 4 Frontend | 3–7 | Port UI into new structure, connect to real API, remove mocks |
-| 5 Real-time and discovery | 6–8 | WebSocket chat, push, PostGIS "near me", image uploads |
-| 6 Quality and security | 8–9 | Test coverage, E2E, load test, security review, legal pages |
-| 7 Deploy | 9–10 | Staging and production, backups, monitoring, runbook |
-| 8 Beta launch | 10+ | One locality, 20–50 users, measure, iterate |
-
----
-
-## 7. Suggested ownership
-
-| Role | Owns |
-|---|---|
-| Backend lead | `backend/`, API design, payments |
-| Frontend lead | `web/`, UX, API integration |
-| DevOps / QA | `infra/`, CI/CD, tests, monitoring |
-| Product / ops | Launch wedge, KYC, legal, beta users, support playbook |
-
----
-
-## 8. Getting started
-
-> To be filled in during Phase 0, once Docker and config files exist. The goal is:
-> 1. Copy `.env.example` files to `.env`
-> 2. Run one command (`make up`) to start database, Redis, API, worker and web
-> 3. Run `make test` to run all tests
-
----
-
-## 9. Docs index
-
-| File | Purpose |
-|---|---|
-| `docs/decisions.md` | Why we chose what we chose |
-| `docs/data-model.md` | Tables and relationships |
-| `docs/state-machine.md` | Allowed status transitions for task, booking, payment |
-| `docs/api.md` | API conventions and link to generated OpenAPI docs |
-| `docs/runbook.md` | Deploy, rollback, backup restore, incident steps |
-| `docs/git-workflow.md` | Branching, commits, PR rules |
-| `docs/legal/` | Terms, privacy policy, grievance process |
+- The current API is open and has no login. Authentication is planned next, so do not deploy this as is.
+- Use `DJANGO_DEBUG=0` and a strong, unique secret key in any shared or production environment.
+- Change the default database password outside local development.

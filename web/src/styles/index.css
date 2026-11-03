@@ -1,0 +1,6 @@
+body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+form { display: flex; gap: .5rem; margin: 1rem 0; }
+input { flex: 1; padding: .5rem; }
+button { padding: .5rem 1rem; cursor: pointer; }
+li { margin: .25rem 0; }
+.ok { color: #1a7f37; } .bad { color: #cf222e; }
