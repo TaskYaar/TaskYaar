@@ -1,6 +1,6 @@
 import os
-from pathlib import Path
 from datetime import timedelta
+from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -21,7 +21,8 @@ INSTALLED_APPS = [
     "corsheaders",
     "apps.tasks",
     "apps.users",
-        "rest_framework_simplejwt.token_blacklist",
+    "rest_framework_simplejwt.token_blacklist",
+    "django_filters",
 ]
 
 MIDDLEWARE = [
@@ -55,6 +56,7 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
+# ---- Rebuilt section: compare with your old file (lines ~59-90) ----
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -80,18 +82,19 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 CORS_ALLOWED_ORIGINS = [
     o for o in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",") if o
 ]
+# ---- End of rebuilt section ----
 
-# Starter settings: open API with no auth. Tighten this when you add login.
 REST_FRAMEWORK = {
-    # ...your existing keys...
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_THROTTLE_RATES": {
         "auth": "10/min",
     },
