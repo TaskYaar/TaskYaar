@@ -2,15 +2,20 @@ import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import Logo from "../components/Logo.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
-import { sendOtp, verifyOtp, errorMessage, MOCK, DEMO_OTP } from "../services/auth.js";
+import { sendOtp, verifyOtp, registerUser, errorMessage, MOCK, DEMO_OTP } from "../services/auth.js";
 
 const LEN = 6;
 const WAIT = 30;
 
+const readSignup = () => {
+  try { return JSON.parse(sessionStorage.getItem("signup")); }
+  catch { return null; }
+};
+
 export default function Verify() {
   const phone = sessionStorage.getItem("phone");
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, updateUser } = useAuth();
 
   const [digits, setDigits] = useState(Array(LEN).fill(""));
   const [error, setError] = useState("");
@@ -33,17 +38,35 @@ export default function Verify() {
   const submit = async (code) => {
     setLoading(true);
     setError("");
+
+    let result;
     try {
-      const { token, user, isNew } = await verifyOtp(phone, code);
-      login(token, user);
-      navigate(isNew || !user ? "/register" : "/home", { replace: true });
+      result = await verifyOtp(phone, code);
     } catch (err) {
       setError(errorMessage(err));
       setDigits(Array(LEN).fill(""));
       refs.current[0]?.focus();
-    } finally {
       setLoading(false);
+      return;
     }
+
+    const { token, user, isNew } = result;
+    login(token, user);
+
+    // Came from the Register tab: save the details they already entered
+    const signup = readSignup();
+    sessionStorage.removeItem("signup");
+    if ((isNew || !user) && signup) {
+      try {
+        const created = await registerUser(phone, signup);
+        updateUser(created);
+        navigate("/home", { replace: true });
+        return;
+      } catch {
+        /* fall through: ask for the details on the profile page */
+      }
+    }
+    navigate(isNew || !user ? "/register" : "/home", { replace: true });
   };
 
   const onChange = (i, value) => {

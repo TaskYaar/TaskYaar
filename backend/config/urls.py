@@ -10,6 +10,7 @@ def health(request):
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/health/", health),
+    path("api/auth/", include("apps.otp_auth.urls")),   # <-- add this
     path("api/", include("apps.tasks.urls")),
-        path("api/", include("apps.users.urls")),
+    path("api/", include("apps.users.urls")),
 ]
