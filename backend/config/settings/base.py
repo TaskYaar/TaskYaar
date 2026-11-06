@@ -1,4 +1,5 @@
 import os
+from django.core.exceptions import ImproperlyConfigured
 from datetime import timedelta
 from pathlib import Path
 
@@ -108,3 +109,14 @@ SIMPLE_JWT = {
     "UPDATE_LAST_LOGIN": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
+
+# ---- OTP / SMS ----
+OTP_FIXED_CODE = os.environ.get("OTP_FIXED_CODE", "")  # dev only, e.g. 123456
+SMS_BACKEND = os.environ.get("SMS_BACKEND", "apps.users.sms.ConsoleSMSBackend")
+
+if not DEBUG:
+    # Safety net: production must never accept a fixed code or "send" SMS to a log file.
+    if OTP_FIXED_CODE:
+        raise ImproperlyConfigured("OTP_FIXED_CODE must be empty when DJANGO_DEBUG is off.")
+    if SMS_BACKEND.endswith("ConsoleSMSBackend"):
+        raise ImproperlyConfigured("Set SMS_BACKEND to a real SMS provider when DJANGO_DEBUG is off.")

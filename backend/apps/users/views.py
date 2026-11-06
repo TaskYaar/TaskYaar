@@ -5,51 +5,58 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.views import TokenRefreshView
 
+from . import services
 from .serializers import (
-    LoginSerializer,
     LogoutSerializer,
-    RegisterSerializer,
+    SendOTPSerializer,
     UserSerializer,
+    VerifyOTPSerializer,
 )
-from .services import issue_tokens
 
 
 class AuthThrottleMixin:
-    """Limits how fast one client can hit auth endpoints (rate: "auth" in settings)."""
+    """Per-client rate limit for auth endpoints (rate "auth" in settings)."""
 
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "auth"
-
-
-class RegisterView(AuthThrottleMixin, generics.CreateAPIView):
-    serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
     authentication_classes = []
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
+
+class SendOTPView(AuthThrottleMixin, APIView):
+    def post(self, request):
+        serializer = SendOTPSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        body = {"user": UserSerializer(user).data, **issue_tokens(user)}
-        return Response(body, status=status.HTTP_201_CREATED)
+        services.send_otp(phone=serializer.validated_data["phone"])
+        return Response({"ok": True, "expires_in": int(services.OTP_TTL.total_seconds())})
 
 
-class LoginView(AuthThrottleMixin, TokenObtainPairView):
-    serializer_class = LoginSerializer
-    authentication_classes = []
+class VerifyOTPView(AuthThrottleMixin, APIView):
+    def post(self, request):
+        serializer = VerifyOTPSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = services.verify_otp(
+            phone=serializer.validated_data["phone"], code=serializer.validated_data["otp"]
+        )
+        is_new = not user.is_profile_complete
+        return Response(
+            {
+                **services.issue_tokens(user),
+                # New users have no profile yet: the app sends them to the profile page.
+                "user": None if is_new else UserSerializer(user).data,
+                "is_new": is_new,
+            }
+        )
 
 
 class RefreshView(AuthThrottleMixin, TokenRefreshView):
-    authentication_classes = []
+    pass
 
 
 class LogoutView(AuthThrottleMixin, APIView):
     """Blacklists the refresh token so it can never be used again."""
-
-    permission_classes = [AllowAny]
-    authentication_classes = []
 
     def post(self, request):
         serializer = LogoutSerializer(data=request.data)

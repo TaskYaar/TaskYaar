@@ -10,14 +10,14 @@ from .models import Category, Task
 LIST = "/api/tasks/"
 
 
-def make_user(email, full_name="Test User"):
-    return User.objects.create_user(email=email, password="Str0ng!pass123", full_name=full_name)
+def make_user(phone, full_name="Test User"):
+    return User.objects.create_user(phone=phone, full_name=full_name, city="Pune")
 
 
 class TaskApiTests(APITestCase):
     def setUp(self):
-        self.owner = make_user("owner@example.com", "Asha Patil")
-        self.other = make_user("other@example.com", "Ravi Shah")
+        self.owner = make_user("+919876500001", "Asha Patil")
+        self.other = make_user("+919876500002", "Ravi Shah")
         self.errands = Category.objects.create(name="Errands", slug="errands")
         self.tech = Category.objects.create(name="Tech help", slug="tech-help")
         self.payload = {

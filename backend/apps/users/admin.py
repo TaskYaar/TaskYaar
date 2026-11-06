@@ -10,13 +10,16 @@ class UserAdmin(DjangoUserAdmin):
     form = UserChangeForm
     add_form = UserCreationForm
     ordering = ("-created_at",)
-    list_display = ("email", "full_name", "role", "is_active", "created_at")
-    list_filter = ("role", "is_active", "is_staff")
-    search_fields = ("email", "full_name", "phone")
+    list_display = ("phone", "full_name", "city", "role", "is_staff", "created_at")
+    list_filter = ("role", "is_staff", "is_active")
+    search_fields = ("phone", "full_name", "email")
     readonly_fields = ("last_login", "created_at", "updated_at")
     fieldsets = (
-        (None, {"fields": ("email", "password")}),
-        ("Personal info", {"fields": ("full_name", "phone", "role")}),
+        (None, {"fields": ("phone", "password")}),
+        (
+            "Profile",
+            {"fields": ("full_name", "email", "city", "role", "phone_verified_at", "terms_accepted_at")},
+        ),
         (
             "Permissions",
             {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")},
@@ -24,11 +27,5 @@ class UserAdmin(DjangoUserAdmin):
         ("Dates", {"fields": ("last_login", "created_at", "updated_at")}),
     )
     add_fieldsets = (
-        (
-            None,
-            {
-                "classes": ("wide",),
-                "fields": ("email", "full_name", "role", "password1", "password2"),
-            },
-        ),
+        (None, {"classes": ("wide",), "fields": ("phone", "full_name", "password1", "password2")}),
     )

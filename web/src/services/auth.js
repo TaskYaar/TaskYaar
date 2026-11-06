@@ -10,6 +10,10 @@ const readUsers = () => {
   catch { return {}; }
 };
 
+// The API uses full_name; the app uses name.
+const toFrontUser = (u) =>
+  u && { id: u.id, phone: u.phone, name: u.full_name, email: u.email, city: u.city, role: u.role };
+
 export async function sendOtp(phone) {
   if (MOCK) {
     await wait();
@@ -29,9 +33,10 @@ export async function verifyOtp(phone, otp) {
   }
   const { data } = await api.post("/auth/verify-otp/", { phone: "+91" + phone, otp });
   localStorage.setItem("refresh", data.refresh);
-  return { token: data.access, user: data.user || null, isNew: Boolean(data.is_new) };
+  return { token: data.access, user: toFrontUser(data.user), isNew: Boolean(data.is_new) };
 }
 
+// Completes the profile of a user who just verified their phone.
 export async function registerUser(phone, profile) {
   if (MOCK) {
     await wait();
@@ -41,27 +46,26 @@ export async function registerUser(phone, profile) {
     localStorage.setItem("mock:users", JSON.stringify(users));
     return user;
   }
-  const { data } = await api.post("/auth/register/", profile);
-  return data.user;
+  const { data } = await api.patch("/users/me/", {
+    full_name: profile.name,
+    email: profile.email,
+    city: profile.city,
+    role: profile.role,
+    accept_terms: true,
+  });
+  return toFrontUser(data);
 }
 
-// Existing Google user -> { token, user }. New Google user -> { signupToken, google }.
-export async function googleLogin(credential) {
-  if (MOCK) {
-    throw new Error("Google sign-in needs the real backend. Set VITE_USE_MOCK=false in web/.env.");
-  }
-  const { data } = await api.post("/auth/google/", { credential });
-  if (data.signup_token) {
-    return { signupToken: data.signup_token, google: data.google };
-  }
-  localStorage.setItem("refresh", data.refresh);
-  return { token: data.access, user: data.user || null };
+// Google sign-in is not part of the MVP backend. These stay exported so existing
+// imports (Register.jsx, GoogleButton) keep working, but they fail with a clear message.
+const GOOGLE_UNAVAILABLE = "Google sign-in is not available yet. Please use your phone number.";
+
+export async function googleLogin() {
+  throw new Error(GOOGLE_UNAVAILABLE);
 }
 
-export async function googleRegister(signupToken, profile) {
-  const { data } = await api.post("/auth/google-register/", { signup_token: signupToken, ...profile });
-  localStorage.setItem("refresh", data.refresh);
-  return { token: data.access, user: data.user };
+export async function googleRegister() {
+  throw new Error(GOOGLE_UNAVAILABLE);
 }
 
 export function errorMessage(err) {
